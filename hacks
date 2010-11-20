@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+
+module Hacks
+  class << self
+    def origin
+      ENV['HACKORIGIN'] || "ssh://gotham.nyhacker.org/home/jcn/var/nyh"
+    end
+    
+    def repo
+      "#{ENV['HOME']}/.nyh"
+    end
+    
+    def hackbin
+      "#{ENV['HOME']}/hackbin"
+    end
+    
+    def projectdir
+      File.join(repo, "projects")
+    end
+  end
+
+  module Git
+    class << self
+      def pull
+        `git clone -q #{Hacks.origin} #{Hacks.repo}` unless File.exists?(Hacks.repo)
+        
+        Dir.chdir(Hacks.repo)
+        `git pull -q origin master`
+      end
+      
+      def push(message)
+        `git commit -m #{message}`
+      end
+    end
+  end
+
+  module Projects
+    class << self
+
+      def list
+        Hacks::Git.pull
+
+        Dir.foreach(Hacks.projectdir) do |entry|
+          next if entry.match(/^\./)
+          
+          project = get_hack(entry)
+
+          printf("%s (%s) - %s\n", project["name"], project["user"], project["description"])
+        end
+      end
+      
+      def get_hack(hackname)
+        path = File.join(Hacks.projectdir, hackname)
+        if File.exists?(path)
+          YAML.load_file(path).merge({:modified => File.mtime(path),:owned => File.owned?(path)})
+        else
+          nil
+        end
+      end
+      
+      def link(hackname)
+        project = get_hack(hackname)
+        if project
+          source = project["source"]
+          filename = File.join(Hacks.hackbin,File.basename(source))
+          `ln -sf #{source} #{filename}`
+          put "Successfully linked!"
+        else
+          put "Hack not found!"
+        end
+      end
+      
+      def add(hackname,description)
+        Hacks::Git.pull
+        
+        hack = get_hack(hackname)
+        if hack.nil? or hack[:owned]
+          
+        else
+          put "This hack is not owned by you."
+        end
+      end
+    end
+  end
+
+  module CLI
+    class << self
+      def usage
+        puts <<-EOL.gsub(/^ {10}/, '')
+          Usage: hacks action [options]
+            list - list all available hacks
+            link hackname - link a hack to your bin/
+            add hackname command description - add a hack to the global listing
+            remove hackname - remove a hack from the global listing
+        EOL
+      end
+    
+      def parse_options
+        command = ARGV.shift
+        
+        case command
+        when "list" then Hacks::Projects.list
+        when "link" then Hacks::Projects.link ARGV.first
+        when "add"  then Hacks::Projects.add ARGV.shift ARGV
+        else             usage
+        end
+      end
+    end
+    
+  end
+  
+end
+
+
+
+Hacks::CLI.parse_options

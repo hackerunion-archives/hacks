@@ -1,0 +1,8 @@
+About:
+Manage nyhacker commandline hacks
+
+Usage: hacks action [options]
+  list - list all available hacks
+  link hackname - link a hack to your bin/
+  add hackname command description - add a hack to the global listing
+  remove hackname - remove a hack from the global listing
